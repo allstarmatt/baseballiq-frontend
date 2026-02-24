@@ -581,7 +581,7 @@ export default function App() {
         setLoading(false);
       });
   }, []);
-
+  
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(160deg,#050c1e 0%,#091222 50%,#050b1c 100%)" }}>
       <style>{`
