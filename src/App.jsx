@@ -556,7 +556,7 @@ export default function App() {
   const [isLive, setIsLive]   = useState(false);
 
   useEffect(() => {
-    fetch("https://baseballiq-production.up.railway.app")
+    fetch("https://baseballiq-production.up.railway.app/api/props")
       .then(res => res.json())
       .then(data => {
         if (data.props && data.props.length > 0) {
