@@ -556,21 +556,26 @@ export default function App() {
   const [isLive, setIsLive]   = useState(false);
 
   useEffect(() => {
-    fetch("https://baseballiq-production.up.railway.app/api/props")
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
+    fetch("https://baseballiq-production.up.railway.app/api/props", {
+      signal: controller.signal
+    })
       .then(res => res.json())
       .then(data => {
+        clearTimeout(timeout);
         if (data.props && data.props.length > 0) {
           setAllProps(data.props);
           setIsLive(true);
         } else {
-          // API returned empty — fall back to mock data
           setAllProps(mockProps);
           setIsLive(false);
         }
         setLoading(false);
       })
       .catch(() => {
-        // API offline — fall back to mock data
+        clearTimeout(timeout);
         setAllProps(mockProps);
         setIsLive(false);
         setLoading(false);
