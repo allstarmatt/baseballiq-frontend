@@ -59,7 +59,8 @@ const propMeta = {
   "Home Run":    { badge:"HR",  color:"#f87171", bg:"rgba(248,113,113,0.10)", border:"rgba(248,113,113,0.28)", icon:"💣" },
   "Hit":         { badge:"HIT", color:"#4ade80", bg:"rgba(74,222,128,0.10)",  border:"rgba(74,222,128,0.28)",  icon:"🎯" },
   "Stolen Base": { badge:"SB",  color:"#60a5fa", bg:"rgba(96,165,250,0.10)",  border:"rgba(96,165,250,0.28)",  icon:"💨" },
-  "Strikeout":   { badge:"K",   color:"#c084fc", bg:"rgba(192,132,252,0.10)", border:"rgba(192,132,252,0.28)", icon:"🌀" },
+  "Strikeout":         { badge:"K",   color:"#c084fc", bg:"rgba(192,132,252,0.10)", border:"rgba(192,132,252,0.28)", icon:"🌀" },
+  "Pitcher Strikeout": { badge:"PKS", color:"#e879f9", bg:"rgba(232,121,249,0.10)", border:"rgba(232,121,249,0.28)", icon:"🎯" },
   "RBI":         { badge:"RBI", color:"#fb923c", bg:"rgba(251,146,60,0.10)",  border:"rgba(251,146,60,0.28)",  icon:"🏃" },
 };
 
@@ -68,7 +69,8 @@ const navItems = [
   { id:"Home Run",    label:"Home Runs",    icon:"💣", color:"#f87171" },
   { id:"Hit",         label:"Hits",         icon:"🎯", color:"#4ade80" },
   { id:"Stolen Base", label:"Stolen Bases", icon:"💨", color:"#60a5fa" },
-  { id:"Strikeout",   label:"Strikeouts",   icon:"🌀", color:"#c084fc" },
+  { id:"Strikeout",         label:"Strikeouts",        icon:"🌀", color:"#c084fc" },
+  { id:"Pitcher Strikeout", label:"Pitcher Ks",         icon:"🎯", color:"#e879f9" },
   { id:"RBI",         label:"RBIs",         icon:"🏃", color:"#fb923c" },
 ];
 
@@ -569,7 +571,7 @@ export default function App() {
     const controller = new AbortController();
     const timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-    fetch(API_URL + "/api/props/", { signal: controller.signal })
+    fetch(API_URL + "/api/props", { signal: controller.signal })
       .then(function(res){ return res.json(); })
       .then(function(data) {
         clearTimeout(timeout);
