@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://baseballiq-production.up.railway.app";
+const API_URL = "https://baseballiq-production.up.railway.app";
 
 // ─── FALLBACK MOCK DATA ───────────────────────────────────────────────────────
 const mockProps = [
@@ -569,7 +569,7 @@ export default function App() {
     const controller = new AbortController();
     const timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-    fetch(API_URL + "/api/props", { signal: controller.signal })
+    fetch(API_URL + "/api/props/", { signal: controller.signal })
       .then(function(res){ return res.json(); })
       .then(function(data) {
         clearTimeout(timeout);
