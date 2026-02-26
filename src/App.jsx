@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+const API_URL = "https://baseballiq-production.up.railway.app";
+
 // ─── FALLBACK MOCK DATA ───────────────────────────────────────────────────────
 const mockProps = [
   { id:1, player_name:"Aaron Judge", team:"NYY", opponent:"BOS", prop_type:"Home Run", line:"Over 0.5 HR", confidence:87, edge:0.142, edge_str:"+14.2%", over_odds:"+320", implied_prob:"23.8%", model_prob:"38.0%", game:"NYY @ BOS", venue:"Fenway Park", lineup_pos:3, pitcher:"Brayan Bello", weather_summary:{temp:82,wind:"OUT 14mph — Favorable",carry:"+6ft",signal:"positive"}, hitter_statcast:{exit_velo_avg:95.1,barrel_pct:"22.4%",hard_hit_pct:"54.2%"}, category_scores:{hitter:84,pitcher:71,park:55,weather:88,situational:72},
@@ -76,20 +78,20 @@ const signalBorder = (s) => s==="positive"?"rgba(34,211,165,0.2)":s==="negative"
 const signalIcon   = (s) => s==="positive"?"▲":s==="negative"?"▼":"●";
 
 const catSignal = (prop, cat) => {
-  if (prop[cat]?.signal) return prop[cat].signal;
-  if (cat === "pitcher_detail" && prop.pitcher_detail?.signal) return prop.pitcher_detail.signal;
-  const score = prop.category_scores?.[cat];
+  if (prop[cat] && prop[cat].signal) return prop[cat].signal;
+  const score = prop.category_scores && prop.category_scores[cat];
   if (score == null) return "neutral";
   return score >= 65 ? "positive" : score <= 40 ? "negative" : "neutral";
 };
 
 // ─── GRADE BADGE ──────────────────────────────────────────────────────────────
-function GradeBadge({ confidence, size=68 }) {
+function GradeBadge({ confidence, size }) {
+  size = size || 68;
   const g = getGrade(confidence);
   return (
-    <div style={{ width:size, height:size, borderRadius:size*0.2, flexShrink:0, background:`linear-gradient(145deg,${g.glow},rgba(255,255,255,.02))`, border:`2px solid ${g.color}50`, boxShadow:`0 0 18px ${g.glow},inset 0 1px 0 ${g.color}18`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
+    <div style={{ width:size, height:size, borderRadius:size*0.2, flexShrink:0, background:"linear-gradient(145deg,"+g.glow+",rgba(255,255,255,.02))", border:"2px solid "+g.color+"50", boxShadow:"0 0 18px "+g.glow+",inset 0 1px 0 "+g.color+"18", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
       <div style={{ position:"absolute", top:-8, right:-8, width:32, height:32, borderRadius:"50%", background:g.color+"10", filter:"blur(10px)" }}/>
-      <span style={{ fontSize:size*0.36, fontWeight:900, color:g.color, lineHeight:1, fontFamily:"'Barlow Condensed',sans-serif", textShadow:`0 0 12px ${g.color}80` }}>{g.letter}</span>
+      <span style={{ fontSize:size*0.36, fontWeight:900, color:g.color, lineHeight:1, fontFamily:"'Barlow Condensed',sans-serif", textShadow:"0 0 12px "+g.color+"80" }}>{g.letter}</span>
       <span style={{ fontSize:size*0.14, color:g.color+"99", fontFamily:"'DM Mono',monospace", marginTop:2 }}>{confidence}%</span>
     </div>
   );
@@ -106,19 +108,21 @@ function FactorRow({ label, value, signal }) {
 }
 
 function FactorPanel({ title, icon, data, fields, signal }) {
-  if (!data) return <div style={{ padding:20, color:"#3d5170", fontFamily:"'DM Mono',monospace", fontSize:11, textAlign:"center" }}>No detail data — connect live API</div>;
+  if (!data) {
+    return <div style={{ padding:20, color:"#3d5170", fontFamily:"'DM Mono',monospace", fontSize:11, textAlign:"center" }}>No detail data available</div>;
+  }
   const sc = signalColor(signal);
   return (
-    <div style={{ borderRadius:10, overflow:"hidden", border:`1px solid ${signalBorder(signal)}`, background:signalBg(signal) }}>
+    <div style={{ borderRadius:10, overflow:"hidden", border:"1px solid "+signalBorder(signal), background:signalBg(signal) }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", background:"rgba(0,0,0,0.2)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:7 }}>
           <span style={{ fontSize:14 }}>{icon}</span>
           <span style={{ fontSize:11, fontWeight:700, color:sc, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".1em" }}>{title}</span>
         </div>
-        <span style={{ fontSize:10, fontWeight:700, color:sc, fontFamily:"'DM Mono',monospace" }}>{signalIcon(signal)} {signal?.toUpperCase()}</span>
+        <span style={{ fontSize:10, fontWeight:700, color:sc, fontFamily:"'DM Mono',monospace" }}>{signalIcon(signal)} {signal ? signal.toUpperCase() : ""}</span>
       </div>
       <div style={{ padding:"4px 14px 10px" }}>
-        {fields.map(f => <FactorRow key={f.label} label={f.label} value={data[f.key]} signal={f.signal}/>)}
+        {fields.map(function(f) { return <FactorRow key={f.label} label={f.label} value={data[f.key]} signal={f.signal}/>; })}
       </div>
     </div>
   );
@@ -128,12 +132,14 @@ function FactorPanel({ title, icon, data, fields, signal }) {
 function LoadingSkeleton() {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-      <style>{`@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
-      {[1,2,3,4].map(i => (
-        <div key={i} style={{ height:90, borderRadius:16, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)", position:"relative", overflow:"hidden" }}>
-          <div style={{ position:"absolute", inset:0, background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)", animation:"shimmer 1.5s infinite" }}/>
-        </div>
-      ))}
+      <style>{"@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}"}</style>
+      {[1,2,3,4].map(function(i) {
+        return (
+          <div key={i} style={{ height:90, borderRadius:16, background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.06)", position:"relative", overflow:"hidden" }}>
+            <div style={{ position:"absolute", inset:0, background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent)", animation:"shimmer 1.5s infinite" }}/>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -141,7 +147,7 @@ function LoadingSkeleton() {
 // ─── DATA BADGE ───────────────────────────────────────────────────────────────
 function DataBadge({ isLive }) {
   return (
-    <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:6, background:isLive?"rgba(34,211,165,0.1)":"rgba(251,146,60,0.1)", border:`1px solid ${isLive?"rgba(34,211,165,0.3)":"rgba(251,146,60,0.3)"}` }}>
+    <div style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:6, background:isLive?"rgba(34,211,165,0.1)":"rgba(251,146,60,0.1)", border:"1px solid "+(isLive?"rgba(34,211,165,0.3)":"rgba(251,146,60,0.3)") }}>
       <div style={{ width:6, height:6, borderRadius:"50%", background:isLive?"#22d3a5":"#fb923c" }}/>
       <span style={{ fontSize:9, fontWeight:700, color:isLive?"#22d3a5":"#fb923c", fontFamily:"'DM Mono',monospace", letterSpacing:".1em" }}>{isLive?"LIVE DATA":"DEMO DATA"}</span>
     </div>
@@ -155,11 +161,11 @@ function PropCard({ prop, rank, expanded, onToggle }) {
   const g  = getGrade(prop.confidence);
 
   const tabs = [
-    { id:"hitter",       label:"Hitter",    icon:"🏏" },
-    { id:"pitcher_detail",label:"Pitcher",  icon:"⚾" },
-    { id:"park",         label:"Park",      icon:"🏟️" },
-    { id:"weather",      label:"Weather",   icon:"🌤️" },
-    { id:"situational",  label:"Situation", icon:"📋" },
+    { id:"hitter",        label:"Hitter",    icon:"🏏" },
+    { id:"pitcher_detail",label:"Pitcher",   icon:"⚾" },
+    { id:"park",          label:"Park",      icon:"🏟️" },
+    { id:"weather",       label:"Weather",   icon:"🌤️" },
+    { id:"situational",   label:"Situation", icon:"📋" },
   ];
 
   const hitterFields = [
@@ -173,8 +179,8 @@ function PropCard({ prop, rank, expanded, onToggle }) {
     {label:"Platoon Split",         key:"platoonSplit",  signal:null},
     {label:"xSLG",                  key:"xSLG",          signal:"positive"},
     {label:"xwOBA",                 key:"xwOBA",         signal:"positive"},
-    {label:"Rolling 10–15G Power",  key:"rolling10",     signal:null},
-    {label:"Barrel% (L14–30 days)", key:"barrelLast30",  signal:null},
+    {label:"Rolling 10-15G Power",  key:"rolling10",     signal:null},
+    {label:"Barrel% (L14-30 days)", key:"barrelLast30",  signal:null},
   ];
   const pitcherFields = [
     {label:"Pitcher",               key:"name",             signal:null},
@@ -205,36 +211,35 @@ function PropCard({ prop, rank, expanded, onToggle }) {
     {label:"Air Density",    key:"airDensity", signal:null},
   ];
   const sitFields = [
-    {label:"Lineup Position",           key:"lineupPos",        signal:null},
-    {label:"Projected PAs",             key:"projPA",           signal:null},
-    {label:"Bullpen (Behind Starter)",  key:"bullpen",          signal:null},
-    {label:"Game Total (O/U)",          key:"gameTotal",        signal:null},
-    {label:"Implied Team Total",        key:"impliedTeamTotal", signal:null},
-    {label:"Recent Trend",              key:"trend",            signal:null},
+    {label:"Lineup Position",          key:"lineupPos",        signal:null},
+    {label:"Projected PAs",            key:"projPA",           signal:null},
+    {label:"Bullpen (Behind Starter)", key:"bullpen",          signal:null},
+    {label:"Game Total (O/U)",         key:"gameTotal",        signal:null},
+    {label:"Implied Team Total",       key:"impliedTeamTotal", signal:null},
+    {label:"Recent Trend",             key:"trend",            signal:null},
   ];
 
-  const tabFields = { hitter:hitterFields, pitcher_detail:pitcherFields, park:parkFields, weather:weatherFields, situational:sitFields };
+  const fieldMap = { hitter:hitterFields, pitcher_detail:pitcherFields, park:parkFields, weather:weatherFields, situational:sitFields };
 
   return (
-    <div onClick={onToggle} style={{ background:expanded?"linear-gradient(135deg,rgba(18,26,46,.99),rgba(10,16,32,.99))":"linear-gradient(135deg,rgba(11,18,34,.92),rgba(7,12,24,.92))", border:`1px solid ${expanded?g.color+"45":"rgba(255,255,255,0.06)"}`, borderRadius:16, padding:"18px 22px", cursor:"pointer", transition:"all .25s ease", marginBottom:10, boxShadow:expanded?`0 10px 36px rgba(0,0,0,.45),0 0 0 1px ${g.color}12`:"0 2px 10px rgba(0,0,0,.3)", position:"relative", overflow:"hidden" }}>
-      <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, borderRadius:"16px 0 0 16px", background:`linear-gradient(180deg,${g.color},${g.color}00)` }}/>
-
+    <div onClick={onToggle} style={{ background:expanded?"linear-gradient(135deg,rgba(18,26,46,.99),rgba(10,16,32,.99))":"linear-gradient(135deg,rgba(11,18,34,.92),rgba(7,12,24,.92))", border:"1px solid "+(expanded?g.color+"45":"rgba(255,255,255,0.06)"), borderRadius:16, padding:"18px 22px", cursor:"pointer", transition:"all .25s ease", marginBottom:10, boxShadow:expanded?"0 10px 36px rgba(0,0,0,.45),0 0 0 1px "+g.color+"12":"0 2px 10px rgba(0,0,0,.3)", position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"absolute", left:0, top:0, bottom:0, width:3, borderRadius:"16px 0 0 16px", background:"linear-gradient(180deg,"+g.color+","+g.color+"00)" }}/>
       <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-        <div style={{ width:30, height:30, borderRadius:8, flexShrink:0, background:rank<=3?g.glow:"rgba(255,255,255,0.03)", border:`1px solid ${rank<=3?g.color+"40":"rgba(255,255,255,0.06)"}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:rank<=3?g.color:"#2d3f5a", fontFamily:"'Barlow Condensed',sans-serif" }}>{rank}</div>
+        <div style={{ width:30, height:30, borderRadius:8, flexShrink:0, background:rank<=3?g.glow:"rgba(255,255,255,0.03)", border:"1px solid "+(rank<=3?g.color+"40":"rgba(255,255,255,0.06)"), display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:rank<=3?g.color:"#2d3f5a", fontFamily:"'Barlow Condensed',sans-serif" }}>{rank}</div>
         <GradeBadge confidence={prop.confidence} size={68}/>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
             <span style={{ fontSize:20, fontWeight:900, color:"#f1f5f9", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".02em" }}>{prop.player_name}</span>
-            <span style={{ padding:"2px 8px", borderRadius:6, fontSize:10, fontWeight:700, background:pc.bg, border:`1px solid ${pc.border}`, color:pc.color, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".1em" }}>{pc.badge}</span>
+            <span style={{ padding:"2px 8px", borderRadius:6, fontSize:10, fontWeight:700, background:pc.bg, border:"1px solid "+pc.border, color:pc.color, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".1em" }}>{pc.badge}</span>
             <span style={{ fontSize:11, color:"#2d3f5a", fontFamily:"'DM Mono',monospace" }}>{prop.team}</span>
           </div>
           <div style={{ fontSize:12, color:"#3d5170", marginTop:3, fontFamily:"'DM Mono',monospace" }}>{prop.line} · {prop.game}</div>
           {!expanded && (
             <div style={{ display:"flex", gap:5, marginTop:8, flexWrap:"wrap" }}>
-              {["hitter","pitcher_detail","park","weather","situational"].map(cat => {
+              {["hitter","pitcher_detail","park","weather","situational"].map(function(cat) {
                 const s = catSignal(prop, cat);
                 return (
-                  <div key={cat} style={{ display:"flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:5, background:signalBg(s), border:`1px solid ${signalBorder(s)}` }}>
+                  <div key={cat} style={{ display:"flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:5, background:signalBg(s), border:"1px solid "+signalBorder(s) }}>
                     <span style={{ fontSize:8, color:signalColor(s) }}>{signalIcon(s)}</span>
                     <span style={{ fontSize:8, color:signalColor(s), fontFamily:"'DM Mono',monospace", letterSpacing:".06em" }}>{cat==="pitcher_detail"?"PTCH":cat.slice(0,4).toUpperCase()}</span>
                   </div>
@@ -244,7 +249,7 @@ function PropCard({ prop, rank, expanded, onToggle }) {
           )}
         </div>
         <div style={{ textAlign:"right", flexShrink:0 }}>
-          <div style={{ display:"inline-block", padding:"2px 8px", borderRadius:6, marginBottom:4, background:g.glow, border:`1px solid ${g.color}35`, fontSize:10, fontWeight:700, color:g.color, fontFamily:"'DM Mono',monospace", letterSpacing:".1em" }}>{g.desc.toUpperCase()}</div>
+          <div style={{ display:"inline-block", padding:"2px 8px", borderRadius:6, marginBottom:4, background:g.glow, border:"1px solid "+g.color+"35", fontSize:10, fontWeight:700, color:g.color, fontFamily:"'DM Mono',monospace", letterSpacing:".1em" }}>{g.desc.toUpperCase()}</div>
           <div style={{ fontSize:22, fontWeight:900, color:g.color, fontFamily:"'Barlow Condensed',sans-serif", lineHeight:1 }}>{prop.edge_str}</div>
           <div style={{ fontSize:11, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", marginTop:1 }}>edge · {prop.over_odds}</div>
         </div>
@@ -252,43 +257,30 @@ function PropCard({ prop, rank, expanded, onToggle }) {
       </div>
 
       {expanded && (
-        <div onClick={e=>e.stopPropagation()} style={{ marginTop:20, borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:20 }}>
-          {/* Grade Banner */}
-          <div style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 18px", background:`linear-gradient(135deg,${g.glow},rgba(255,255,255,.01))`, borderRadius:12, border:`1px solid ${g.color}30`, marginBottom:20 }}>
-            <div style={{ width:54, height:54, borderRadius:12, background:g.glow, border:`2px solid ${g.color}55`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <div onClick={function(e){e.stopPropagation();}} style={{ marginTop:20, borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:20 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 18px", background:"linear-gradient(135deg,"+g.glow+",rgba(255,255,255,.01))", borderRadius:12, border:"1px solid "+g.color+"30", marginBottom:20 }}>
+            <div style={{ width:54, height:54, borderRadius:12, background:g.glow, border:"2px solid "+g.color+"55", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
               <span style={{ fontSize:22, fontWeight:900, color:g.color, fontFamily:"'Barlow Condensed',sans-serif", lineHeight:1 }}>{g.letter}</span>
               <span style={{ fontSize:9, color:g.color+"88", fontFamily:"'DM Mono',monospace" }}>{prop.confidence}%</span>
             </div>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:14, fontWeight:700, color:g.color, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".06em" }}>{g.letter} — {g.desc.toUpperCase()} PLAY</div>
               <div style={{ fontSize:11, color:"#3d5170", fontFamily:"'DM Mono',monospace", marginTop:3, lineHeight:1.6 }}>Model: {prop.model_prob} · Book: {prop.implied_prob} · Edge: {prop.edge_str}</div>
-              <div style={{ display:"flex", gap:5, marginTop:8, flexWrap:"wrap" }}>
-                {["hitter","pitcher_detail","park","weather","situational"].map(cat => {
-                  const s = catSignal(prop, cat);
-                  return (
-                    <div key={cat} style={{ display:"flex", alignItems:"center", gap:4, padding:"3px 9px", borderRadius:6, background:signalBg(s), border:`1px solid ${signalBorder(s)}` }}>
-                      <span style={{ fontSize:9, color:signalColor(s) }}>{signalIcon(s)}</span>
-                      <span style={{ fontSize:9, color:signalColor(s), fontFamily:"'DM Mono',monospace", letterSpacing:".06em", fontWeight:600 }}>{cat==="pitcher_detail"?"PITCHER":cat.toUpperCase()}</span>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
             <svg width="50" height="50" style={{ transform:"rotate(-90deg)", flexShrink:0 }}>
               <circle cx="25" cy="25" r="20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="5"/>
-              <circle cx="25" cy="25" r="20" fill="none" stroke={g.color} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${(prop.confidence/100)*(2*Math.PI*20)} ${2*Math.PI*20}`} style={{ filter:`drop-shadow(0 0 4px ${g.color})` }}/>
+              <circle cx="25" cy="25" r="20" fill="none" stroke={g.color} strokeWidth="5" strokeLinecap="round" strokeDasharray={(prop.confidence/100)*(2*Math.PI*20)+" "+(2*Math.PI*20)} style={{ filter:"drop-shadow(0 0 4px "+g.color+")" }}/>
             </svg>
           </div>
 
-          {/* Prob Bar */}
           <div style={{ marginBottom:20 }}>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
-              <span style={{ fontSize:10, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", letterSpacing:".08em" }}>BOOK PROBABILITY</span>
-              <span style={{ fontSize:10, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", letterSpacing:".08em" }}>MODEL PROBABILITY</span>
+              <span style={{ fontSize:10, color:"#2d3f5a", fontFamily:"'DM Mono',monospace" }}>BOOK PROBABILITY</span>
+              <span style={{ fontSize:10, color:"#2d3f5a", fontFamily:"'DM Mono',monospace" }}>MODEL PROBABILITY</span>
             </div>
             <div style={{ position:"relative", height:8, background:"rgba(255,255,255,0.04)", borderRadius:4 }}>
               <div style={{ position:"absolute", left:0, top:0, height:"100%", borderRadius:4, width:prop.implied_prob, background:"rgba(100,116,139,.35)" }}/>
-              <div style={{ position:"absolute", left:0, top:0, height:"100%", borderRadius:4, width:prop.model_prob, background:`linear-gradient(90deg,${g.color}60,${g.color})`, boxShadow:`0 0 8px ${g.color}40` }}/>
+              <div style={{ position:"absolute", left:0, top:0, height:"100%", borderRadius:4, width:prop.model_prob, background:"linear-gradient(90deg,"+g.color+"60,"+g.color+")", boxShadow:"0 0 8px "+g.color+"40" }}/>
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", marginTop:5 }}>
               <span style={{ fontSize:12, color:"#3d5170", fontFamily:"'DM Mono',monospace" }}>{prop.implied_prob}</span>
@@ -296,18 +288,19 @@ function PropCard({ prop, rank, expanded, onToggle }) {
             </div>
           </div>
 
-          {/* Category Score Bar */}
           {prop.category_scores && Object.keys(prop.category_scores).length > 0 && (
             <div style={{ marginBottom:20, padding:"12px 16px", background:"rgba(255,255,255,0.02)", borderRadius:10, border:"1px solid rgba(255,255,255,0.05)" }}>
               <div style={{ fontSize:9, color:"#1e3550", fontFamily:"'DM Mono',monospace", letterSpacing:".12em", marginBottom:10 }}>CATEGORY SCORES</div>
               <div style={{ display:"flex", gap:8 }}>
-                {Object.entries(prop.category_scores).map(([cat, score]) => {
+                {Object.entries(prop.category_scores).map(function(entry) {
+                  const cat = entry[0];
+                  const score = entry[1];
                   const s = score >= 65 ? "positive" : score <= 40 ? "negative" : "neutral";
                   return (
                     <div key={cat} style={{ flex:1, textAlign:"center" }}>
                       <div style={{ fontSize:9, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", marginBottom:4 }}>{cat.toUpperCase().slice(0,4)}</div>
                       <div style={{ height:40, background:"rgba(255,255,255,0.03)", borderRadius:4, position:"relative", overflow:"hidden" }}>
-                        <div style={{ position:"absolute", bottom:0, left:0, right:0, height:`${score}%`, background:signalColor(s)+"40", borderRadius:4 }}/>
+                        <div style={{ position:"absolute", bottom:0, left:0, right:0, height:score+"%", background:signalColor(s)+"40", borderRadius:4 }}/>
                         <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
                           <span style={{ fontSize:11, fontWeight:800, color:signalColor(s), fontFamily:"'Barlow Condensed',sans-serif" }}>{Math.round(score)}</span>
                         </div>
@@ -319,13 +312,12 @@ function PropCard({ prop, rank, expanded, onToggle }) {
             </div>
           )}
 
-          {/* Tab Bar */}
           <div style={{ display:"flex", gap:4, marginBottom:16, borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
-            {tabs.map(t => {
+            {tabs.map(function(t) {
               const s = catSignal(prop, t.id);
               const isActive = activeTab === t.id;
               return (
-                <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{ display:"flex", alignItems:"center", gap:5, padding:"8px 12px 10px", background:"transparent", border:"none", borderBottom:`2px solid ${isActive?signalColor(s):"transparent"}`, cursor:"pointer", transition:"all .18s", opacity:isActive?1:0.5 }}>
+                <button key={t.id} onClick={function(){setActiveTab(t.id);}} style={{ display:"flex", alignItems:"center", gap:5, padding:"8px 12px 10px", background:"transparent", border:"none", borderBottom:"2px solid "+(isActive?signalColor(s):"transparent"), cursor:"pointer", transition:"all .18s", opacity:isActive?1:0.5 }}>
                   <span style={{ fontSize:12 }}>{t.icon}</span>
                   <span style={{ fontSize:10, fontWeight:700, color:isActive?signalColor(s):"#475569", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".06em", whiteSpace:"nowrap" }}>{t.label.toUpperCase()}</span>
                   <span style={{ fontSize:8, color:signalColor(s) }}>{signalIcon(s)}</span>
@@ -334,29 +326,29 @@ function PropCard({ prop, rank, expanded, onToggle }) {
             })}
           </div>
 
-          {/* Tab Content */}
           <div style={{ marginBottom:16 }}>
-            {activeTab==="hitter"        && <FactorPanel title="HITTER FACTORS"      icon="🏏" data={prop.hitter}        fields={hitterFields}  signal={catSignal(prop,"hitter")}/>}
-            {activeTab==="pitcher_detail"&& <FactorPanel title="PITCHER FACTORS"     icon="⚾" data={prop.pitcher_detail} fields={pitcherFields} signal={catSignal(prop,"pitcher_detail")}/>}
-            {activeTab==="park"          && <FactorPanel title="BALLPARK FACTORS"    icon="🏟️" data={prop.park}          fields={parkFields}    signal={catSignal(prop,"park")}/>}
-            {activeTab==="weather"       && <FactorPanel title="WEATHER CONDITIONS"  icon="🌤️" data={prop.weather}       fields={weatherFields} signal={catSignal(prop,"weather")}/>}
-            {activeTab==="situational"   && <FactorPanel title="SITUATIONAL FACTORS" icon="📋" data={prop.situational}   fields={sitFields}     signal={catSignal(prop,"situational")}/>}
+            {activeTab==="hitter"         && <FactorPanel title="HITTER FACTORS"      icon="🏏" data={prop.hitter}         fields={hitterFields}  signal={catSignal(prop,"hitter")}/>}
+            {activeTab==="pitcher_detail" && <FactorPanel title="PITCHER FACTORS"     icon="⚾" data={prop.pitcher_detail}  fields={pitcherFields} signal={catSignal(prop,"pitcher_detail")}/>}
+            {activeTab==="park"           && <FactorPanel title="BALLPARK FACTORS"    icon="🏟️" data={prop.park}           fields={parkFields}    signal={catSignal(prop,"park")}/>}
+            {activeTab==="weather"        && <FactorPanel title="WEATHER CONDITIONS"  icon="🌤️" data={prop.weather}        fields={weatherFields} signal={catSignal(prop,"weather")}/>}
+            {activeTab==="situational"    && <FactorPanel title="SITUATIONAL FACTORS" icon="📋" data={prop.situational}    fields={sitFields}     signal={catSignal(prop,"situational")}/>}
           </div>
 
-          {/* Stats strip + CTA */}
           <div style={{ display:"flex", gap:12, alignItems:"center", padding:"12px 16px", background:"rgba(255,255,255,.018)", borderRadius:8, border:"1px solid rgba(255,255,255,0.05)" }}>
             {[
-              {label:"BARREL RATE", val:prop.hitter_statcast?.barrel_pct || prop.hitter?.barrelPct},
-              {label:"EXIT VELO",   val:prop.hitter_statcast?.exit_velo_avg ? `${prop.hitter_statcast.exit_velo_avg} mph` : prop.hitter?.exitVeloAvg},
-              {label:"xwOBA",       val:prop.hitter?.xwOBA},
+              {label:"BARREL RATE", val:prop.hitter_statcast&&prop.hitter_statcast.barrel_pct ? prop.hitter_statcast.barrel_pct : prop.hitter&&prop.hitter.barrelPct},
+              {label:"EXIT VELO",   val:prop.hitter_statcast&&prop.hitter_statcast.exit_velo_avg ? prop.hitter_statcast.exit_velo_avg+" mph" : prop.hitter&&prop.hitter.exitVeloAvg},
+              {label:"xwOBA",       val:prop.hitter&&prop.hitter.xwOBA},
               {label:"OPPONENT",    val:prop.opponent},
-            ].map((s,i) => (
-              <div key={i} style={{ flex:1 }}>
-                <div style={{ fontSize:9, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", letterSpacing:".1em" }}>{s.label}</div>
-                <div style={{ fontSize:15, fontWeight:800, color:"#e2e8f0", fontFamily:"'Barlow Condensed',sans-serif", marginTop:1 }}>{s.val||"—"}</div>
-              </div>
-            ))}
-            <button onClick={e=>e.stopPropagation()} style={{ padding:"8px 16px", borderRadius:8, cursor:"pointer", flexShrink:0, background:g.glow, border:`1px solid ${g.color}45`, color:g.color, fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".1em" }}>+ TRACK BET</button>
+            ].map(function(s, i) {
+              return (
+                <div key={i} style={{ flex:1 }}>
+                  <div style={{ fontSize:9, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", letterSpacing:".1em" }}>{s.label}</div>
+                  <div style={{ fontSize:15, fontWeight:800, color:"#e2e8f0", fontFamily:"'Barlow Condensed',sans-serif", marginTop:1 }}>{s.val||"—"}</div>
+                </div>
+              );
+            })}
+            <button onClick={function(e){e.stopPropagation();}} style={{ padding:"8px 16px", borderRadius:8, cursor:"pointer", flexShrink:0, background:g.glow, border:"1px solid "+g.color+"45", color:g.color, fontSize:11, fontWeight:700, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".1em" }}>+ TRACK BET</button>
           </div>
         </div>
       )}
@@ -372,9 +364,14 @@ function PropPage({ propType, allProps, loading }) {
   const pm = propMeta[propType];
 
   const list = allProps
-    .filter(p => p.prop_type === propType)
-    .filter(p => { if(tierFilter==="A Tier") return p.confidence>=80; if(tierFilter==="B Tier") return p.confidence>=70&&p.confidence<80; if(tierFilter==="C Tier") return p.confidence<70; return true; })
-    .sort((a,b) => sortBy==="edge" ? (b.edge||0)-(a.edge||0) : b.confidence-a.confidence);
+    .filter(function(p){ return p.prop_type === propType; })
+    .filter(function(p){
+      if (tierFilter==="A Tier") return p.confidence >= 80;
+      if (tierFilter==="B Tier") return p.confidence >= 70 && p.confidence < 80;
+      if (tierFilter==="C Tier") return p.confidence < 70;
+      return true;
+    })
+    .sort(function(a,b){ return sortBy==="edge" ? (b.edge||0)-(a.edge||0) : b.confidence-a.confidence; });
 
   const top = list[0];
 
@@ -390,7 +387,7 @@ function PropPage({ propType, allProps, loading }) {
             </h2>
           </div>
           {top && (
-            <div style={{ textAlign:"right", padding:"14px 18px", background:pm.bg, border:`1px solid ${pm.border}`, borderRadius:12 }}>
+            <div style={{ textAlign:"right", padding:"14px 18px", background:pm.bg, border:"1px solid "+pm.border, borderRadius:12 }}>
               <div style={{ fontSize:9, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", letterSpacing:".12em", marginBottom:4 }}>TODAY'S TOP PICK</div>
               <div style={{ fontSize:18, fontWeight:900, color:pm.color, fontFamily:"'Barlow Condensed',sans-serif" }}>{top.player_name}</div>
               <div style={{ fontSize:11, color:"#3d5170", fontFamily:"'DM Mono',monospace" }}>{getGrade(top.confidence).letter} · {top.confidence}% · {top.edge_str} edge</div>
@@ -398,21 +395,27 @@ function PropPage({ propType, allProps, loading }) {
           )}
         </div>
       </div>
-
       <div style={{ display:"flex", gap:6, alignItems:"center", marginBottom:20, flexWrap:"wrap" }}>
         <span style={{ fontSize:9, color:"#1e3550", fontFamily:"'DM Mono',monospace", letterSpacing:".12em" }}>TIER:</span>
-        {["All","A Tier","B Tier","C Tier"].map(t => (
-          <button key={t} onClick={()=>setTier(t)} style={{ padding:"5px 11px", borderRadius:7, fontSize:10, cursor:"pointer", fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:".04em", background:tierFilter===t?pm.color+"22":"rgba(255,255,255,.03)", color:tierFilter===t?pm.color:"#2d3f5a", border:`1px solid ${tierFilter===t?pm.color+"50":"rgba(255,255,255,.06)"}` }}>{t.toUpperCase()}</button>
-        ))}
+        {["All","A Tier","B Tier","C Tier"].map(function(t) {
+          return (
+            <button key={t} onClick={function(){setTier(t);}} style={{ padding:"5px 11px", borderRadius:7, fontSize:10, cursor:"pointer", fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700, letterSpacing:".04em", background:tierFilter===t?pm.color+"22":"rgba(255,255,255,.03)", color:tierFilter===t?pm.color:"#2d3f5a", border:"1px solid "+(tierFilter===t?pm.color+"50":"rgba(255,255,255,.06)") }}>{t.toUpperCase()}</button>
+          );
+        })}
         <div style={{ flex:1 }}/>
-        {["confidence","edge"].map(s => (
-          <button key={s} onClick={()=>setSortBy(s)} style={{ padding:"5px 11px", borderRadius:7, fontSize:10, cursor:"pointer", fontFamily:"'DM Mono',monospace", background:sortBy===s?"rgba(255,255,255,.07)":"transparent", color:sortBy===s?"#94a3b8":"#1e3550", border:`1px solid ${sortBy===s?"rgba(255,255,255,.12)":"rgba(255,255,255,.03)"}` }}>↓ {s}</button>
-        ))}
+        {["confidence","edge"].map(function(s) {
+          return (
+            <button key={s} onClick={function(){setSortBy(s);}} style={{ padding:"5px 11px", borderRadius:7, fontSize:10, cursor:"pointer", fontFamily:"'DM Mono',monospace", background:sortBy===s?"rgba(255,255,255,.07)":"transparent", color:sortBy===s?"#94a3b8":"#1e3550", border:"1px solid "+(sortBy===s?"rgba(255,255,255,.12)":"rgba(255,255,255,.03)") }}>↓ {s}</button>
+          );
+        })}
       </div>
-
-      {loading ? <LoadingSkeleton/> : list.length===0
-        ? <div style={{ textAlign:"center", padding:"48px 0", color:"#1e3550", fontFamily:"'DM Mono',monospace", fontSize:12 }}>No props found for this type today.</div>
-        : list.map((prop,i) => <PropCard key={prop.id||i} prop={prop} rank={i+1} expanded={expanded===i} onToggle={()=>setExpanded(expanded===i?null:i)}/>)
+      {loading
+        ? <LoadingSkeleton/>
+        : list.length === 0
+          ? <div style={{ textAlign:"center", padding:"48px 0", color:"#1e3550", fontFamily:"'DM Mono',monospace", fontSize:12 }}>No props found for this type today.</div>
+          : list.map(function(prop, i) {
+              return <PropCard key={prop.id||i} prop={prop} rank={i+1} expanded={expanded===i} onToggle={function(){setExpanded(expanded===i?null:i);}}/>;
+            })
       }
     </div>
   );
@@ -423,23 +426,29 @@ function HomePage({ navigate, allProps, loading, isLive }) {
   const [expanded, setExpanded] = useState(null);
   const [sortBy, setSortBy]     = useState("confidence");
 
-  const sorted = [...allProps].sort((a,b) =>
-    sortBy==="edge" ? (b.edge||0)-(a.edge||0) : b.confidence-a.confidence
-  );
+  const sorted = allProps.slice().sort(function(a,b){
+    return sortBy==="edge" ? (b.edge||0)-(a.edge||0) : b.confidence-a.confidence;
+  });
 
-  const aCount = allProps.filter(p=>p.confidence>=80).length;
-  const bCount = allProps.filter(p=>p.confidence>=70&&p.confidence<80).length;
-  const cCount = allProps.filter(p=>p.confidence<70).length;
+  const aCount = allProps.filter(function(p){ return p.confidence >= 80; }).length;
+  const bCount = allProps.filter(function(p){ return p.confidence >= 70 && p.confidence < 80; }).length;
+  const cCount = allProps.filter(function(p){ return p.confidence < 70; }).length;
 
-  const sections = Object.keys(propMeta).map(type => ({
-    type,
-    count: allProps.filter(p=>p.prop_type===type).length,
-    top:   allProps.filter(p=>p.prop_type===type).sort((a,b)=>b.confidence-a.confidence)[0],
-  }));
+  const sections = Object.keys(propMeta).map(function(type) {
+    const typeProps = allProps.filter(function(p){ return p.prop_type === type; });
+    return {
+      type: type,
+      count: typeProps.length,
+      top: typeProps.sort(function(a,b){ return b.confidence - a.confidence; })[0],
+    };
+  });
+
+  const avgEdge = allProps.length
+    ? "+"+(allProps.reduce(function(s,p){ return s+(p.edge||0); }, 0)/allProps.length*100).toFixed(1)+"%"
+    : "—";
 
   return (
     <div>
-      {/* Hero */}
       <div style={{ paddingTop:36, paddingBottom:26, borderBottom:"1px solid rgba(255,255,255,0.05)", marginBottom:26 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
           <div>
@@ -450,9 +459,7 @@ function HomePage({ navigate, allProps, loading, isLive }) {
             <h1 style={{ fontSize:52, fontWeight:900, lineHeight:.86, fontFamily:"'Barlow Condensed',sans-serif", color:"#f1f5f9", margin:0 }}>
               ALL<br/><span style={{ color:"#22d3a5" }}>TOP PLAYS</span>
             </h1>
-            <div style={{ fontSize:11, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", marginTop:10 }}>
-              5 factor categories · 30+ data points per player
-            </div>
+            <div style={{ fontSize:11, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", marginTop:10 }}>5 factor categories · 30+ data points per player</div>
           </div>
           <div style={{ textAlign:"right" }}>
             <div style={{ fontSize:10, color:"#1a3050", fontFamily:"'DM Mono',monospace", letterSpacing:".1em" }}>{new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase()}</div>
@@ -461,63 +468,66 @@ function HomePage({ navigate, allProps, loading, isLive }) {
         </div>
       </div>
 
-      {/* Stats strip */}
       <div style={{ display:"flex", borderRadius:12, overflow:"hidden", border:"1px solid rgba(255,255,255,0.06)", marginBottom:26 }}>
         {[
-          {label:"TOTAL PROPS",  val:allProps.length, c:null},
-          {label:"A / A+ PLAYS", val:aCount,          c:"#22d3a5"},
-          {label:"B PLAYS",      val:bCount,           c:"#facc15"},
-          {label:"C PLAYS",      val:cCount,           c:"#f97316"},
-          {label:"AVG EDGE",     val: allProps.length ? `+${(allProps.reduce((s,p)=>s+(p.edge||0),0)/allProps.length*100).toFixed(1)}%` : "—", c:null},
-          {label:"DATA SOURCE",  val:isLive?"LIVE":"DEMO", c:isLive?"#22d3a5":"#fb923c"},
-        ].map((s,i) => (
-          <div key={i} style={{ flex:1, padding:"12px 14px", background:i%2===0?"rgba(255,255,255,.018)":"rgba(255,255,255,.012)", borderRight:i<5?"1px solid rgba(255,255,255,.05)":"none" }}>
-            <div style={{ fontSize:8, color:"#1e3550", letterSpacing:".14em", fontFamily:"'DM Mono',monospace", marginBottom:3 }}>{s.label}</div>
-            <div style={{ fontSize:20, fontWeight:900, color:s.c||"#e2e8f0", fontFamily:"'Barlow Condensed',sans-serif" }}>{s.val}</div>
-          </div>
-        ))}
+          {label:"TOTAL PROPS",  val:allProps.length,      c:null},
+          {label:"A / A+ PLAYS", val:aCount,                c:"#22d3a5"},
+          {label:"B PLAYS",      val:bCount,                c:"#facc15"},
+          {label:"C PLAYS",      val:cCount,                c:"#f97316"},
+          {label:"AVG EDGE",     val:avgEdge,               c:null},
+          {label:"DATA SOURCE",  val:isLive?"LIVE":"DEMO",  c:isLive?"#22d3a5":"#fb923c"},
+        ].map(function(s, i) {
+          return (
+            <div key={i} style={{ flex:1, padding:"12px 14px", background:i%2===0?"rgba(255,255,255,.018)":"rgba(255,255,255,.012)", borderRight:i<5?"1px solid rgba(255,255,255,.05)":"none" }}>
+              <div style={{ fontSize:8, color:"#1e3550", letterSpacing:".14em", fontFamily:"'DM Mono',monospace", marginBottom:3 }}>{s.label}</div>
+              <div style={{ fontSize:20, fontWeight:900, color:s.c||"#e2e8f0", fontFamily:"'Barlow Condensed',sans-serif" }}>{s.val}</div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Prop category cards */}
       <div style={{ marginBottom:30 }}>
         <div style={{ fontSize:9, color:"#1e3550", letterSpacing:".16em", fontFamily:"'DM Mono',monospace", marginBottom:12 }}>BROWSE BY PROP TYPE</div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:8 }}>
-          {sections.map(ps => {
+          {sections.map(function(ps) {
             const pm = propMeta[ps.type];
             const topG = ps.top ? getGrade(ps.top.confidence) : null;
             return (
-              <div key={ps.type} onClick={()=>navigate(ps.type)} style={{ padding:"16px 14px", borderRadius:12, cursor:"pointer", background:`linear-gradient(145deg,${pm.bg},rgba(255,255,255,.02))`, border:`1px solid ${pm.border}`, transition:"all .2s ease" }}
-                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 8px 24px ${pm.bg}`;}}
-                onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+              <div key={ps.type} onClick={function(){navigate(ps.type);}} style={{ padding:"16px 14px", borderRadius:12, cursor:"pointer", background:"linear-gradient(145deg,"+pm.bg+",rgba(255,255,255,.02))", border:"1px solid "+pm.border, transition:"all .2s ease" }}
+                onMouseEnter={function(e){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 24px "+pm.bg;}}
+                onMouseLeave={function(e){e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
                 <div style={{ fontSize:24, marginBottom:8 }}>{pm.icon}</div>
                 <div style={{ fontSize:12, fontWeight:800, color:pm.color, fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".04em", marginBottom:2 }}>{ps.type.toUpperCase()}</div>
                 <div style={{ fontSize:10, color:"#2d3f5a", fontFamily:"'DM Mono',monospace", marginBottom:8 }}>{ps.count} props today</div>
-                {ps.top && topG ? (
-                  <div style={{ padding:"4px 8px", borderRadius:6, background:topG.glow, border:`1px solid ${topG.color}30`, display:"inline-block" }}>
-                    <span style={{ fontSize:10, fontWeight:700, color:topG.color, fontFamily:"'Barlow Condensed',sans-serif" }}>{topG.letter} · {ps.top.player_name.split(" ").pop()}</span>
-                  </div>
-                ) : (
-                  <div style={{ fontSize:10, color:"#1e3550", fontFamily:"'DM Mono',monospace" }}>No props yet</div>
-                )}
+                {ps.top && topG
+                  ? <div style={{ padding:"4px 8px", borderRadius:6, background:topG.glow, border:"1px solid "+topG.color+"30", display:"inline-block" }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:topG.color, fontFamily:"'Barlow Condensed',sans-serif" }}>{topG.letter} · {ps.top.player_name.split(" ").pop()}</span>
+                    </div>
+                  : <div style={{ fontSize:10, color:"#1e3550", fontFamily:"'DM Mono',monospace" }}>No props yet</div>
+                }
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* All props */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:9, color:"#1e3550", letterSpacing:".16em", fontFamily:"'DM Mono',monospace" }}>ALL PROPS — RANKED BY CONFIDENCE</div>
         <div style={{ display:"flex", gap:5 }}>
-          {["confidence","edge"].map(s => (
-            <button key={s} onClick={()=>setSortBy(s)} style={{ padding:"5px 10px", borderRadius:7, fontSize:10, cursor:"pointer", fontFamily:"'DM Mono',monospace", background:sortBy===s?"rgba(255,255,255,.07)":"transparent", color:sortBy===s?"#94a3b8":"#1e3550", border:`1px solid ${sortBy===s?"rgba(255,255,255,.12)":"rgba(255,255,255,.03)"}` }}>↓ {s}</button>
-          ))}
+          {["confidence","edge"].map(function(s) {
+            return (
+              <button key={s} onClick={function(){setSortBy(s);}} style={{ padding:"5px 10px", borderRadius:7, fontSize:10, cursor:"pointer", fontFamily:"'DM Mono',monospace", background:sortBy===s?"rgba(255,255,255,.07)":"transparent", color:sortBy===s?"#94a3b8":"#1e3550", border:"1px solid "+(sortBy===s?"rgba(255,255,255,.12)":"rgba(255,255,255,.03)") }}>↓ {s}</button>
+            );
+          })}
         </div>
       </div>
 
-      {loading ? <LoadingSkeleton/> : sorted.map((prop,i) => (
-        <PropCard key={prop.id||i} prop={prop} rank={i+1} expanded={expanded===i} onToggle={()=>setExpanded(expanded===i?null:i)}/>
-      ))}
+      {loading
+        ? <LoadingSkeleton/>
+        : sorted.map(function(prop, i) {
+            return <PropCard key={prop.id||i} prop={prop} rank={i+1} expanded={expanded===i} onToggle={function(){setExpanded(expanded===i?null:i);}}/>;
+          })
+      }
     </div>
   );
 }
@@ -532,12 +542,12 @@ function NavBar({ active, navigate }) {
           <span style={{ fontSize:14, fontWeight:900, color:"#22d3a5", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".1em" }}>BASEBALLIQ</span>
         </div>
         <div style={{ width:1, height:20, background:"rgba(255,255,255,0.08)", marginRight:8, flexShrink:0 }}/>
-        {navItems.map(item => {
-          const isActive = active===item.id;
+        {navItems.map(function(item) {
+          const isActive = active === item.id;
           return (
-            <button key={item.id} onClick={()=>navigate(item.id)} style={{ padding:"0 14px", height:52, background:"transparent", border:"none", borderBottom:`2px solid ${isActive?item.color:"transparent"}`, cursor:"pointer", display:"flex", alignItems:"center", gap:6, transition:"all .18s", flexShrink:0, opacity:isActive?1:0.45 }}
-              onMouseEnter={e=>{if(!isActive)e.currentTarget.style.opacity=".75";}}
-              onMouseLeave={e=>{if(!isActive)e.currentTarget.style.opacity=".45";}}>
+            <button key={item.id} onClick={function(){navigate(item.id);}} style={{ padding:"0 14px", height:52, background:"transparent", border:"none", borderBottom:"2px solid "+(isActive?item.color:"transparent"), cursor:"pointer", display:"flex", alignItems:"center", gap:6, transition:"all .18s", flexShrink:0, opacity:isActive?1:0.45 }}
+              onMouseEnter={function(e){if(!isActive)e.currentTarget.style.opacity=".75";}}
+              onMouseLeave={function(e){if(!isActive)e.currentTarget.style.opacity=".45";}}>
               <span style={{ fontSize:14 }}>{item.icon}</span>
               <span style={{ fontSize:12, fontWeight:700, color:isActive?item.color:"#64748b", fontFamily:"'Barlow Condensed',sans-serif", letterSpacing:".06em", whiteSpace:"nowrap" }}>{item.label.toUpperCase()}</span>
             </button>
@@ -550,20 +560,18 @@ function NavBar({ active, navigate }) {
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [page, setPage]       = useState("home");
-  const [allProps, setAllProps] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isLive, setIsLive]   = useState(false);
+  const [page, setPage]         = useState("home");
+  const [allProps, setAllProps]  = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [isLive, setIsLive]     = useState(false);
 
-  useEffect(() => {
+  useEffect(function() {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/props`), {
-      signal: controller.signal
-    })
-      .then(res => res.json())
-      .then(data => {
+    fetch(API_URL + "/api/props", { signal: controller.signal })
+      .then(function(res){ return res.json(); })
+      .then(function(data) {
         clearTimeout(timeout);
         if (data.props && data.props.length > 0) {
           setAllProps(data.props);
@@ -574,28 +582,20 @@ export default function App() {
         }
         setLoading(false);
       })
-      .catch(() => {
+      .catch(function() {
         clearTimeout(timeout);
         setAllProps(mockProps);
         setIsLive(false);
         setLoading(false);
       });
   }, []);
-  
+
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(160deg,#050c1e 0%,#091222 50%,#050b1c 100%)" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0}
-        button{outline:none}
-        ::-webkit-scrollbar{width:4px;height:4px}
-        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:2px}
-      `}</style>
-
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap'); *{box-sizing:border-box;margin:0;padding:0} button{outline:none} ::-webkit-scrollbar{width:4px;height:4px} ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:2px}"}</style>
       <NavBar active={page} navigate={setPage}/>
-
       <div style={{ maxWidth:860, margin:"0 auto", padding:"0 22px 64px" }}>
-        {page==="home"
+        {page === "home"
           ? <HomePage navigate={setPage} allProps={allProps} loading={loading} isLive={isLive}/>
           : <PropPage propType={page} allProps={allProps} loading={loading}/>
         }
