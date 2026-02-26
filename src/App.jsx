@@ -571,7 +571,7 @@ export default function App() {
     const controller = new AbortController();
     const timeout = setTimeout(function(){ controller.abort(); }, 60000);
 
-    fetch(API_URL + "/api/props", { signal: controller.signal })
+    fetch(API_URL + "/api/props/", { signal: controller.signal })
       .then(function(res){ return res.json(); })
       .then(function(data) {
         clearTimeout(timeout);
