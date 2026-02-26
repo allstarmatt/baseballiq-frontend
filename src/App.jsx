@@ -559,7 +559,7 @@ export default function App() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60000);
 
-    fetch("https://baseballiq-production.up.railway.app/api/props", {
+    fetch(`${import.meta.env.VITE_API_URL}/api/props`), {
       signal: controller.signal
     })
       .then(res => res.json())
