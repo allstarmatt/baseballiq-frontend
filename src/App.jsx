@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_URL = "https://baseballiq-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL || "https://baseballiq-production.up.railway.app";
 
 // ─── FALLBACK MOCK DATA ───────────────────────────────────────────────────────
 const mockProps = [
